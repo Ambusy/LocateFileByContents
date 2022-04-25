@@ -1,6 +1,8 @@
 # LocateFileByContents
 Browse a map on a Windows PC and locate files that contain a text or combined texts
 
+Run the FindFile.exe.
+
 How to use:
 1. choose a file filter (if not specified \*.\* is used)
 2. browse to the starting directory, choose whether to include hidden maps, or not.
@@ -13,3 +15,5 @@ While looking at this file, the next one is already being located.
 
 If at any moment you want to abandon searching a specifid directory at a lower level, click on its name. If the response is not immediate, retry clicking.
 To end all searching, click STOP.
+
+The program is build in Visual Studio Community 2019, feel free to improve it.
