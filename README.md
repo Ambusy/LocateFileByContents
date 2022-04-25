@@ -2,7 +2,7 @@
 Browse a map on a Windows PC and locate files that contain a text or combined texts
 
 How to use:
-1. choose a file filter (if not specified *.* is used)
+1. choose a file filter (if not specified \*.\* is used)
 2. browse to the starting directory, choose whether to include hidden maps, or not.
 3. enter at least one text to be present in the requested file and add it to the list.
 4. if more than one text is entered, name the connecting boolean operator & or |. Normal logic is applied, without braces. & preceeds |.
