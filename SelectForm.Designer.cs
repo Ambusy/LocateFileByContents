@@ -66,6 +66,7 @@ namespace FindFile
             this.SrcMask.Size = new System.Drawing.Size(182, 21);
             this.SrcMask.TabIndex = 41;
             this.SrcMask.SelectedIndexChanged += new System.EventHandler(this.SrcMask_SelectedIndexChanged);
+            this.SrcMask.TextChanged += new System.EventHandler(this.SrcMask_TextChanged);
             // 
             // incHidden
             // 

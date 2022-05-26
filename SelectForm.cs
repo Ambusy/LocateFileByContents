@@ -1,13 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace FindFile
@@ -17,13 +11,13 @@ namespace FindFile
         int NrFilesFound = 0;
         int NrFoldersError = 0;
         int NrFilesSearched = 0;
-        List<String> DirsToBeProcessed = new List<String>(); // names of directories to be processed
-        string[] filter;
+        int FirstLevelToProcess = -1;
+        readonly List<String>  DirsToBeProcessed = new List<String>(); // names of directories to be processed
         int currentFilelistIndex; // current pointer to file in progress
         int currentFoldelistDirIndex;
         String currentFolderlistDirname; // current folder in progress
         bool HasDisplayFormBeenOpened = false; // opened once, then changes visibility only.
-        TermSearcher ts = new TermSearcher(); // for locating files
+        readonly TermSearcher ts = new TermSearcher(); // for locating files
 
         public SelectForm()
         {
@@ -39,10 +33,10 @@ namespace FindFile
             DialogResult rc = folderBrowserDialog1.ShowDialog();
             if (rc == DialogResult.OK)
             {
+                FirstLevelToProcess = -1;
                 StartMap.Text = folderBrowserDialog1.SelectedPath;
                 FoldersList.Items.Clear();
                 FoldersList.Items.Add(folderBrowserDialog1.SelectedPath);
-                filter = SrcMask.Text.Split(';');
                 M.StartingDirectory = folderBrowserDialog1.SelectedPath;
                 InitLists(folderBrowserDialog1.SelectedPath);
             }
@@ -59,7 +53,7 @@ namespace FindFile
             DirsToBeProcessed.Add(dir);
             FillListboxes(dir);
         }
-        private void dspMsg()
+        private void DspMsg()
         {
             Msg1.Text = NrFilesSearched.ToString() + " searched, " + NrFilesFound.ToString() + " hits, " + (NrFoldersError + M.NrFilesError).ToString() + " no access";
         }
@@ -71,8 +65,10 @@ namespace FindFile
             if (dir.Length == 2) 
                 dir += @"\";
             string[] p = dir.Split('\\');
+            if (FirstLevelToProcess == -1)
+                FirstLevelToProcess = p.Length-1;
             currentFoldelistDirIndex = -1;
-            for (i = 0; i < p.Length; i++) // add parts of foldername, with mapnames indented with a space
+             for (i = 0; i < p.Length; i++) // add parts of foldername, with mapnames indented with a space
             {
                 if (p[i] != "")
                 {
@@ -97,7 +93,7 @@ namespace FindFile
                             FilesList.Items.Add(foundFile.Substring(i + 1));
                     }
             }
-            catch (Exception e)
+            catch (Exception )
             {
                 NrFoldersError += 1;
             }
@@ -128,6 +124,7 @@ namespace FindFile
             {
                 NrFoldersError += 1;
             }
+            FoldersList.Refresh();
         }
         private void SelectForm_Load(object sender, EventArgs e)
         {
@@ -198,6 +195,9 @@ namespace FindFile
         }
         private String GetName() // find name of next file to be processed from Directory-tree
         {
+            Application.DoEvents();
+            if (M.StopSearching)
+                return "";
             currentFilelistIndex += 1;
             if (currentFilelistIndex < FilesList.Items.Count) // file available
             {
@@ -206,21 +206,16 @@ namespace FindFile
             }
             else // no more files, get list of files in next folder (if there is one left)
             {
-                if (M.StopSearching)
-                    return "";
-                if (DirsToBeProcessed.Count > 0)
+                if (DirsToBeProcessed.Count > 1)
                 {
                     String s = DirsToBeProcessed[0];
                     DirsToBeProcessed.RemoveAt(0);
-                    if (DirsToBeProcessed.Count > 0)
-                    {
-                        FillListboxes(s);
-                        if (M.StopSearching)
-                            return "";
-                        dspMsg();
-                        return GetName(); // return 1st file of next list
-                    }
+                    FillListboxes(s);
+                    DspMsg();
+                    return GetName(); // return 1st file of next list
                 }
+                else
+                    M.StopSearching = true; // break the GetName recurrent call list
             }
             return ""; // ready
         }
@@ -254,7 +249,7 @@ namespace FindFile
                     if (ts.LocateTerms(0))
                     {
                         NrFilesFound++;
-                        dspMsg();
+                        DspMsg();
                         DisplayFoundFile();
                     }
                     else 
@@ -262,7 +257,7 @@ namespace FindFile
                 }
                 Application.DoEvents();
             }
-            dspMsg();
+            DspMsg();
             InitLists(folderBrowserDialog1.SelectedPath);
             SearchBut.Visible = true;
         }
@@ -294,7 +289,13 @@ namespace FindFile
 
         private void FoldersList_MouseClick(object sender, MouseEventArgs e)
         {
+            M.StopSearchingCurrent = true;
             int l = (int)((double)e.Y / 12.93)+1; // find the line on which the user clicked. That directory will be considered "completed"
+            if (l < FirstLevelToProcess + 1 || l > FoldersList.Items.Count-1)
+            {
+                M.StopSearching = true;
+                return;
+            }
             String selectedDir = FoldersList.Items[l - 1].ToString();
             int ns = 0;
             for (int i = 0; ns == 0 && i < selectedDir.Length; i++)
@@ -317,8 +318,16 @@ namespace FindFile
                 else
                     stop = true;
             }
-            FillListboxes(DirsToBeProcessed[0]);
-            currentFilelistIndex = -1; // start with first file in list
+            if (DirsToBeProcessed.Count > 0)
+            {
+                if (DirsToBeProcessed[0] != M.StartingDirectory) // returned to start, ready!
+                {
+                    FillListboxes(DirsToBeProcessed[0]);
+                    currentFilelistIndex = -1; // start with first file in list
+                }
+                else M.StopSearching = true;
+            }
+            else M.StopSearching = true;
         }
 
         private void StopBut_Click(object sender, EventArgs e)
@@ -327,6 +336,13 @@ namespace FindFile
             if (M.dspForm.Visible) 
                 M.dspForm.Close();
             M.selForm.Close();
+        }
+
+        private void SrcMask_TextChanged(object sender, EventArgs e)
+        {
+            FoldersList.Items.Clear();
+            FoldersList.Items.Add(folderBrowserDialog1.SelectedPath);
+            InitLists(M.StartingDirectory);
         }
     }
 }

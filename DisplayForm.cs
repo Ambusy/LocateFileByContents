@@ -1,13 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Web;
 using System.Windows.Forms;
 
@@ -15,12 +9,12 @@ namespace FindFile
 {
     public partial class DisplayForm : Form
     {
-        int CharsBeforeTerm = 500; // display 3000 bytes in total on one screen
-        int CharsAfterTerm = 2500;
+        readonly int  CharsBeforeTerm = 500; // display approx. 3000 bytes in total on one screen, found term at potition 501
+        readonly int CharsAfterTerm = 2500;
         long StartDisplayed;
-        ASCIIEncoding ascii = new ASCIIEncoding();
-        UTF8Encoding utf8 = new UTF8Encoding();
-        UTF32Encoding utf32 = new UTF32Encoding();
+        readonly ASCIIEncoding ascii = new ASCIIEncoding();
+        readonly UTF8Encoding utf8 = new UTF8Encoding();
+        readonly UTF32Encoding utf32 = new UTF32Encoding();
 
         public DisplayForm()
         {
@@ -38,31 +32,28 @@ namespace FindFile
             long startRead = Math.Max(0, M.tsd.FoundAtPosition - CharsBeforeTerm);
             M.tsd.DisplayedAtPosition = M.tsd.FoundAtPosition;
             StartDisplayed = startRead;
-            Debug.WriteLine("build p" + " " + M.tsd.FirstIndex.ToString() + " " + CharsBeforeTerm.ToString() + " " + startRead.ToString());
-            byte[] rdBufn = null;
+            byte[] rdBufn;
             int nchRead = CharsBeforeTerm + CharsAfterTerm;
-            M.signal("build r", startRead, nchRead);
-            rdBufn = readBlock(M.tsd, startRead, nchRead);
+            rdBufn = ReadBlock( startRead, nchRead);
             button2.Visible = (rdBufn.Length == nchRead);
-            Debug.WriteLine("Build " + startRead.ToString() + " " + rdBufn.Length.ToString() + " " + (startRead + rdBufn.Length).ToString());
             if (M.tsd.IgnoreCase)
             {
                 if (M.tsd.TypeFile == 'U')
                 {
-                    for (int iPos = 1; iPos < rdBufn.Length; iPos = iPos + 2)
+                    for (int iPos = 1; iPos < rdBufn.Length; iPos += 2)
                     {
                         if (rdBufn[iPos - 1] == 0 && rdBufn[iPos] >= 65 && rdBufn[iPos] <= 90) rdBufn[iPos] += 32;
                     }
                 }
                 else
                 {
-                    for (int iPos = 0; iPos < rdBufn.Length; iPos = iPos + 1)
+                    for (int iPos = 0; iPos < rdBufn.Length; iPos++)
                     {
                         if (rdBufn[iPos] >= 65 && rdBufn[iPos] <= 90) rdBufn[iPos] += 32;
                     }
                 }
             }
-            string html = "";    
+            string html;    
             if (M.tsd.TypeFile == 'A') html = ascii.GetString(rdBufn);
             else if (M.tsd.TypeFile == '8') html = utf8.GetString(rdBufn);
             else html = utf32.GetString(rdBufn);
@@ -124,9 +115,8 @@ namespace FindFile
                 }               
             }
         }
-        private byte[] readBlock(TermSearcher  ts, long start, int nChars)
+        private byte[] ReadBlock( long start, int nChars)
         {
-            M.signal("Display block ", start, nChars);
             M.tsd.Position = start;
             byte[] rdBufn = M.tsd.ReadBytes(nChars);
             return rdBufn;
@@ -138,18 +128,18 @@ namespace FindFile
             this.Visible = false;
        }
 
-        private void button1_Click(object sender, EventArgs e) // stop all
+        private void Button1_Click(object sender, EventArgs e) // stop all
         {
             M.StopSearching = true;
             CloseDisplay();
         }
 
-        private void button3_Click(object sender, EventArgs e) // next file
+        private void Button3_Click(object sender, EventArgs e) // next file
         {
             CloseDisplay();
         }
 
-        private void button2_Click(object sender, EventArgs e) // next occ
+        private void Button2_Click(object sender, EventArgs e) // next occ
         {
             if (button2.Visible)
             {
@@ -160,16 +150,15 @@ namespace FindFile
 
         private void DisplayForm_FormClosing(object sender, FormClosingEventArgs e) // next file
         {
-            button3_Click(sender, e);
+            Button3_Click(sender, e);
             e.Cancel = true;
         }
 
-        private void button4_Click(object sender, EventArgs e) // open
+        private void Button4_Click(object sender, EventArgs e) // open
         {
             String FileName = M.tsd.FileName;
             CloseDisplay();
-            Process myProcess = new Process();
-            myProcess = Process.Start(FileName, "");
+            Process myProcess = Process.Start(FileName, "");
             myProcess.WaitForExit();
         }
     }

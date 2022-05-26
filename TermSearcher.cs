@@ -11,19 +11,13 @@ namespace FindFile
 {
     class TermSearcher
     {
-        RdrData BinReaderData = new RdrData();
+        readonly RdrData BinReaderData = new RdrData();
         private bool ignoreCase = false;
         private long startPositionBeforeRead=0;
         public long FoundAtPosition = 0;
         public long DisplayedAtPosition = -1;
-        private String WhichRdr = ""; 
         public bool Open(String fileName, bool signalAD)
         {
-            if (this == M.tsd) // for debugging purposes
-                WhichRdr = "dsp ";
-            else
-                WhichRdr = "sel ";
-            Debug.WriteLine("open " + WhichRdr + fileName);
             bool Ok = false;
             try
             {
@@ -65,17 +59,16 @@ namespace FindFile
         }
         public void Close()
         {
-            Debug.WriteLine("close " + WhichRdr + BinReaderData.fileName);
             BinReaderData.reader.Close();
             BinReaderData.reader.Dispose();
         }
-        private String ByteToString(byte[] inp)
-        {
-            String outps = System.Text.Encoding.ASCII.GetString(inp);
-            return outps;
-        }
+        //private String ByteToString(byte[] inp)
+        //{
+        //    String outps = System.Text.Encoding.ASCII.GetString(inp);
+        //    return outps;
+        //}
 
-        private int even(int i)
+        private int MakeEven(int i)
         {
             if (i % 2 == 0)
                 return i;
@@ -97,43 +90,39 @@ namespace FindFile
                     Position = start + 0;
                     chLeft = Length - Position;
                     int m = Math.Max(Math.Max(M.terms.MaxLenTermA, M.terms.MaxLenTerm8), M.terms.MaxLenTermU);
-                    ncHead = (int)Math.Min(chLeft, even(m));
+                    ncHead = (int)Math.Min(chLeft, MakeEven(m));
                     M.terms.MaxLenTerm = m;
                     break;
                 case 'U':
                     Position = start + 2;
                     chLeft = Length - Position;
-                    ncHead = (int)Math.Min(chLeft, even(M.terms.MaxLenTermU));
+                    ncHead = (int)Math.Min(chLeft, MakeEven(M.terms.MaxLenTermU));
                     M.terms.MaxLenTerm = M.terms.MaxLenTermU;
                     break;
                 case '8':
                     Position = start + 3;
                     chLeft = Length - Position;
-                    ncHead = (int)Math.Min(chLeft, even(M.terms.MaxLenTerm8));
+                    ncHead = (int)Math.Min(chLeft, MakeEven(M.terms.MaxLenTerm8));
                     M.terms.MaxLenTerm = M.terms.MaxLenTerm8;
                     break;
                 default:
                     break;
             }
             BinReaderData.firstIndex = 0;
-            M.signal("ReadHead " + WhichRdr, Position, ncHead);
             rdBufi = ReadBytes((int)ncHead);
             chLeft -= rdBufi.Length;
             prevChars += rdBufi.Length;
             bool Found = false;
             while (chLeft > 0)
             {
-                Application.DoEvents();
-                if (M.StopSearching) return (false);
                 int ncBlock = (int)Math.Min(chLeft, blLength);
-                M.signal("ReadBytes " + WhichRdr, Position, ncBlock  );
                 rdBufn = ReadBytes(ncBlock);
                 chLeft -= rdBufn.Length;
                 int ncToVerify = ncBlock + ncHead;
                 int ncToDiscard = blLength - M.terms.MaxLenTerm; // tail will be new head
                 if (chLeft == 0)
                     ncToDiscard = rdBufn.Length; // no more tail
-                SearchPartial(rdBufi, rdBufn, ncToVerify, prevChars);
+                SearchPartial(rdBufi, rdBufn, ncToVerify);
                 Found = ResultReady();
                 if (Found)
                 {
@@ -144,29 +133,37 @@ namespace FindFile
                     Buffer.BlockCopy(rdBufn, blLength - M.terms.MaxLenTerm, rdBufi, 0, M.terms.MaxLenTerm); // last part of BLOCK to HEAD
                 }
                 prevChars += rdBufn.Length;
+                Application.DoEvents();
+                if (M.StopSearchingCurrent)
+                {
+                    //chLeft = 0;
+                    M.StopSearchingCurrent = false;
+                    return false;
+                }
+                if (M.StopSearching) return (false);
             }
             if (!Found)
-                SearchPartial(rdBufi, rdBufn, rdBufi.Length,prevChars); // search only last head 
+                SearchPartial(rdBufi, rdBufn, rdBufi.Length); // search only last head 
             return Found;
         }
-        private void SearchPartial(byte[] rdBufi, byte[] rdBufn, int nPos, long prevChars)
+        private void SearchPartial(byte[] rdBufi, byte[] rdBufn, int nPos)
         {
             foreach (SearchTerm sT in M.Terms)
             {
                 byte[] sTerm = sT.searchBytesA;
                 if (TypeFile == '8') sTerm = sT.searchBytes8;
                 if (TypeFile == 'U') sTerm = sT.searchBytesU;
-                bool Found = TryOneTerm(sT, rdBufi, rdBufn, nPos, TypeFile, sTerm, prevChars);
+                bool Found = TryOneTerm(sT, rdBufi, rdBufn, nPos, TypeFile, sTerm);
                 if (!Found)
                     if (TypeFile == 'A')
                     {
-                        Found = TryOneTerm(sT, rdBufi, rdBufn, nPos, '8', sT.searchBytes8, prevChars); // if Ascii not found, try again with utf8 for files without BOM but utf8
+                        Found = TryOneTerm(sT, rdBufi, rdBufn, nPos, '8', sT.searchBytes8); // if Ascii not found, try again with utf8 for files without BOM but utf8
                         if (!Found)
-                            TryOneTerm(sT, rdBufi, rdBufn, nPos - 1, 'U', sT.searchBytesU, prevChars); // if still not found, try again with Unicode for files with mixed Ascii and Unicode (example binaries)
+                            TryOneTerm(sT, rdBufi, rdBufn, nPos - 1, 'U', sT.searchBytesU); // if still not found, try again with Unicode for files with mixed Ascii and Unicode (example binaries)
                     }
             }
         }
-        private bool TryOneTerm(SearchTerm sT, byte[] rdBufi, byte[] rdBufn, int nPos, Char typeFile, byte[] sTerm, long prevChars)
+        private bool TryOneTerm(SearchTerm sT, byte[] rdBufi, byte[] rdBufn, int nPos, Char typeFile, byte[] sTerm)
         {
 
             int iPos = 1; // position number of char to be verified, in combined (HEAD + BLOCK) buffer
@@ -219,9 +216,7 @@ namespace FindFile
                     if (nCharOk == sTerm.Length)
                     {
                         fndTerm = true;
-                        M.signal("Found at ", startPositionBeforeRead, iPos - sTerm.Length);
                         BinReaderData.firstIndex = startPositionBeforeRead + iPos - sTerm.Length; // prevChars - rdBufi.Length + iPos; // remember first hit.
-                        M.signal("startpos ", BinReaderData.firstIndex,0);
                     }
                 }
                 else if (iChar > 0) // iChar: number of matching characters

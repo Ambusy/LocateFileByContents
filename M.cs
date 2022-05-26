@@ -2,9 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace FindFile
@@ -16,6 +14,7 @@ namespace FindFile
         public static DisplayForm dspForm = new DisplayForm();
         public static string StartingDirectory = "";
         public static bool StopSearching = false;
+        public static bool StopSearchingCurrent = false;
         public static TermMgr terms;
         public static int NrFilesError;
         public static List<SearchTerm> Terms = new List<SearchTerm>();
@@ -38,9 +37,9 @@ namespace FindFile
             File.Delete(WrkfileName);
             return 0;
         }
-        public static  void signal(String what, long start, long len) // for debugging purposes
+        public static  void Signal(String what, long start, long len) // for debugging purposes
         {
-            Debug.WriteLine(what + " " + start.ToString() + " " + len.ToString() + " " + (start + len).ToString());
+            //Debug.WriteLine(what + " " + start.ToString() + " " + len.ToString() + " " + (start + len).ToString());
         }
     }
     class SearchTerm
